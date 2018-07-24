@@ -69,6 +69,13 @@ module.exports = function (options) {
      */
     entry: helpers.root('index.ts'),
 
+    /**
+     * As of Webpack 4 we need to set the mode.
+     * Since this is a library and it uses gulp to build the library,
+     * we only have Demo, Test, and Perf.
+     */
+    mode: 'development',
+
     devtool: 'inline-source-map',
 
     /*
