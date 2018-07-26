@@ -5,21 +5,20 @@
 const helpers = require('./helpers');
 const path = require('path');
 const stringify = require('json-stringify');
+
 /**
  * Webpack Plugins
  */
 const webpack = require('webpack');
-const ProvidePlugin = require('webpack/lib/ProvidePlugin');
 const ContextReplacementPlugin = require('webpack/lib/ContextReplacementPlugin');
 const DefinePlugin = require('webpack/lib/DefinePlugin');
 const LoaderOptionsPlugin = require('webpack/lib/LoaderOptionsPlugin');
-// const ExtractTextPlugin = require('extract-text-webpack-plugin');
-const StyleLintPlugin = require('stylelint-webpack-plugin');
+//const StyleLintPlugin = require('stylelint-webpack-plugin');
 /**
  * Webpack Constants
  */
 const ENV = process.env.ENV = process.env.NODE_ENV = 'test';
-const API_URL = process.env.API_URL || (ENV==='inmemory'?'app/':'http://localhost:8080/api/');
+const API_URL = process.env.API_URL || (ENV === 'inmemory'?'app/':'http://localhost:8080/api/');
 const FABRIC8_WIT_API_URL = process.env.FABRIC8_WIT_API_URL;
 const FABRIC8_RECOMMENDER_API_URL = process.env.FABRIC8_RECOMMENDER_API_URL || 'http://api-bayesian.dev.rdu2c.fabric8.io/api/v1/';
 
@@ -28,7 +27,7 @@ const FABRIC8_RECOMMENDER_API_URL = process.env.FABRIC8_RECOMMENDER_API_URL || '
  *
  * See: http://webpack.github.io/docs/configuration.html#cli
  */
-module.exports = function (options) {
+module.exports = function () {
   return {
 
     entry: {
@@ -36,12 +35,19 @@ module.exports = function (options) {
     },
 
     /**
+     * As of Webpack 4 we need to set the mode.
+     * Since this is a library and it uses gulp to build the library,
+     * we only have Test and Perf.
+     */
+    //mode: 'development',
+
+    /**
      * Source map for Karma from the help of karma-sourcemap-loader &  karma-webpack
      *
      * Do not change, leave as is or it wont work.
      * See: https://github.com/webpack/karma-webpack#source-maps
      */
-    //devtool: 'inline-source-map',
+    devtool: 'inline-source-map',
 
     /**
      * Options affecting the resolving of modules.
@@ -64,13 +70,6 @@ module.exports = function (options) {
      * See: http://webpack.github.io/docs/configuration.html#module
      */
     module: {
-
-    /**
-     * An array of applied pre and post loaders.
-     *
-     * See: http://webpack.github.io/docs/configuration.html#module-preloaders-module-postloaders
-     */
-
       /**
        * An array of automatically applied loaders.
        *
@@ -87,15 +86,15 @@ module.exports = function (options) {
          *
          * See: https://github.com/webpack/source-map-loader
          */
-        // {
-        //   test: /\.js$/,
-        //   use: ['source-map-loader'],
-        //   exclude: [
-        //     // these packages have problems with their sourcemaps
-        //     helpers.root('node_modules/rxjs'),
-        //     helpers.root('node_modules/@angular')
-        //   ]
-        // },
+        {
+          test: /\.js$/,
+          use: ['source-map-loader'],
+          exclude: [
+            // these packages have problems with their sourcemaps
+            helpers.root('node_modules/rxjs'),
+            helpers.root('node_modules/@angular')
+          ]
+        },
 
         /**
          * Typescript loader support for .ts and Angular 2 async routes via .async.ts
@@ -105,15 +104,9 @@ module.exports = function (options) {
         {
           test: /\.ts$/,
           use: [
-            {
-              loader: "awesome-typescript-loader",
-              options: {
-                configFileName: 'tsconfig-test.json'
-              }
-            },
-            {
-              loader: "angular2-template-loader"
-            }
+            // 'awesome-typescript-loader',
+            'ts-loader',
+            'angular2-template-loader'
           ],
           exclude: [/\.e2e\.ts$/]
         },
@@ -125,7 +118,8 @@ module.exports = function (options) {
          */
         {
           test: /\.json$/,
-          use: ['json-loader'],
+          type: "javascript/auto",
+          use: ['custom-json-loader'],
           exclude: [helpers.root('src/index.html')]
         },
 
@@ -136,47 +130,51 @@ module.exports = function (options) {
          */
         {
           test: /\.css$/,
-          loaders: [
-            { loader: "to-string-loader" },
+          use: [{
+              loader: "to-string-loader"
+            },
             {
               loader: "style-loader"
             },
             {
               loader: "css-loader"
             },
-          ],
+          ]
         },
-        
+
         {
-          test: /\.component\.less$/,
+          test: /\.less$/,
           use: [
             {
-              loader: 'to-string-loader'
-            }, {
+              loader: 'css-to-string-loader'
+            },
+            {
               loader: 'css-loader',
               options: {
-                minimize: true,
                 sourceMap: true,
                 context: '/'
               }
-            }, {
+            },
+            {
               loader: 'less-loader',
               options: {
                 paths: [
-                  path.resolve(__dirname, "../node_modules/patternfly/src/less"),
-                  path.resolve(__dirname, "../node_modules/patternfly/node_modules")
+                  path.resolve(__dirname, "../node_modules/patternfly/dist/less"),
+                  path.resolve(__dirname, "../node_modules/patternfly/dist/less/dependencies"),
+                  path.resolve(__dirname, "../node_modules/patternfly/dist/less/dependencies/bootstrap"),
+                  path.resolve(__dirname, "../node_modules/patternfly/dist/less/dependencies/font-awesome"),
                 ],
                 sourceMap: true
               }
             }
-          ],
+          ]
         },
 
         /* File loader for supporting fonts, for example, in CSS files.
          */
         {
           test: /\.woff2?$|\.ttf$|\.eot$|\.svg$/,
-          loaders: [
+          use: [
             {
               loader: "url-loader",
               query: {
@@ -187,7 +185,7 @@ module.exports = function (options) {
           ]
         }, {
           test: /\.jpg$|\.png$|\.gif$|\.jpeg$/,
-          loaders: [
+          use: [
             {
               loader: "url-loader",
               query: {
@@ -215,19 +213,19 @@ module.exports = function (options) {
          *
          * See: https://github.com/deepsweet/istanbul-instrumenter-loader
          */
-        {
-          enforce: 'post',
-          test: /\.(js|ts)$/,
-          loader: 'istanbul-instrumenter-loader',
-          query: {
-            esModules: true
-          },
-          include: helpers.root('src'),
-          exclude: [
-            /\.(e2e|spec)\.ts$/,
-            /node_modules/
-          ]
-        }
+        // {
+        //   enforce: 'post',
+        //   test: /\.(js|ts)$/,
+        //   loader: 'istanbul-instrumenter-loader',
+        //   query: {
+        //     esModules: true
+        //   },
+        //   include: helpers.root('src'),
+        //   exclude: [
+        //     /\.(e2e|spec)\.ts$/,
+        //     /node_modules/
+        //   ]
+        // }
       ]
     },
 
@@ -268,11 +266,29 @@ module.exports = function (options) {
        */
       new ContextReplacementPlugin(
         // The (\\|\/) piece accounts for path separators in *nix and Windows
+        // /angular(\\|\/)core(\\|\/)@angular/,
+        /\@angular(\\|\/)core(\\|\/)fesm5/,
+        helpers.root('./src')
+      ),
+      new ContextReplacementPlugin(
+        // The (\\|\/) piece accounts for path separators in *nix and Windows
         /angular(\\|\/)core(\\|\/)(esm(\\|\/)src|src)(\\|\/)linker/,
         helpers.root('src') // location of your src
       ),
 
-       /**
+      /*
+       * StyleLintPlugin
+       */
+      // new StyleLintPlugin({
+      //   configFile: '.stylelintrc',
+      //   syntax: 'less',
+      //   context: 'src',
+      //   files: '**/*.less',
+      //   failOnError: true,
+      //   quiet: false,
+      // }),
+
+      /**
        * Plugin LoaderOptionsPlugin (experimental)
        *
        * See: https://gist.github.com/sokra/27b24881210b56bbaff7
@@ -293,19 +309,9 @@ module.exports = function (options) {
             resourcePath: 'src'
           }
         }
-      }),
-      /*
-       * StyleLintPlugin
-       */
-      new StyleLintPlugin({
-        configFile: '.stylelintrc',
-        syntax: 'less',
-        context: 'src',
-        files: '**/*.less',
-        failOnError: true,
-        quiet: false,
       })
     ],
+
     /**
      * Include polyfills or mocks for various node stuff
      * Description: Node configuration

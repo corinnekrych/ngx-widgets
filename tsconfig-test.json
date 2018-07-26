@@ -11,8 +11,7 @@
     "allowSyntheticDefaultImports": true,
     "sourceMap": true,
     "inlineSources": true,
-    "noEmitHelpers": false,
-    "doc-noEmitHelpers": "Planner and demo won't run when true",
+    "noEmitHelpers": false, // Planner and demo won't run when true
     "strictNullChecks": false,
     "noImplicitAny": true,
     "allowUnreachableCode": false,
@@ -28,7 +27,7 @@
       "moment": ["node_modules/moment"]
     },
     "lib": [
-      "es2015",
+      "es6",
       "dom"
     ]
   },

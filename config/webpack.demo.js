@@ -5,23 +5,20 @@ const path = require('path');
 /**
  * Webpack Plugins
  */
-const CommonsChunkPlugin = webpack.optimize.CommonsChunkPlugin;
-const DefinePlugin = require('webpack/lib/DefinePlugin');
-const ExtractTextPlugin = require('extract-text-webpack-plugin');
-const IgnorePlugin = require('webpack/lib/IgnorePlugin');
+const AotPlugin = require('@ngtools/webpack').AngularCompilerPlugin;
+const CleanWebpackPlugin = require('clean-webpack-plugin');
+const ContextReplacementPlugin = require('webpack/lib/ContextReplacementPlugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
-const LoaderOptionsPlugin = require('webpack/lib/LoaderOptionsPlugin');
-const NamedModulesPlugin = require('webpack/lib/NamedModulesPlugin');
-const NormalModuleReplacementPlugin = require('webpack/lib/NormalModuleReplacementPlugin');
-const ProvidePlugin = require('webpack/lib/ProvidePlugin');
-const UglifyJsPlugin = require('webpack/lib/optimize/UglifyJsPlugin');
-const TsConfigPathsPlugin = require('awesome-typescript-loader').TsConfigPathsPlugin;
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const OptimizeJsPlugin = require('optimize-js-plugin');
 const StyleLintPlugin = require('stylelint-webpack-plugin');
-// ExtractTextPlugin
-const extractCSS = new ExtractTextPlugin({
-  filename: '[name].[id].css',
-  allChunks: true
-});
+const TypedocWebpackPlugin = require('typedoc-webpack-plugin');
+
+
+// NOTE: AOT is temporarily disabled because mini-css-extract-plugin has an issue with AngularCompilerPlugin
+// See: https://github.com/webpack-contrib/mini-css-extract-plugin/issues/186
+// const aotMode = false;
 
 module.exports = {
   devServer: {
@@ -29,6 +26,13 @@ module.exports = {
     stats: 'minimal',
     inline: true
   },
+
+  /**
+   * As of Webpack 4 we need to set the mode.
+   * Since this is a library and it uses gulp to build the library,
+   * we only have Demo, Test, and Perf.
+   */
+  mode: 'development',
 
   devtool: 'cheap-module-eval-source-map',
 
@@ -49,73 +53,89 @@ module.exports = {
 
   module: {
     rules: [
+      // {
+      //   test: /\.ts$/,
+      //   enforce: 'pre',
+      //   use: [{
+      //     loader: 'tslint-loader',
+      //     options: {
+      //       emitErrors: false,
+      //       failOnHint: false,
+      //       resourcePath: 'src',
+      //       typeCheck: true,
+      //     }
+      //   }],
+      //   exclude: [helpers.root('node_modules')]
+      // },
+
       {
         test: /\.ts$/,
         loaders: [
-          'awesome-typescript-loader',
+          'ts-loader',
           'angular2-template-loader'
         ],
         exclude: [/\.(spec|e2e)\.ts$/]
       },
+
+      /* Raw loader support for *.html
+       * Returns file content as string
+       *
+       * See: https://github.com/webpack/raw-loader
+       */
       {
         test: /\.html$/,
-        loader: 'html-loader'
-      }, {
-        test: /\.css$/,
-        loader: extractCSS.extract({
-          fallback: "style-loader",
-          use: "css-loader?sourceMap&context=/"
-        })
-      }, {
-        test: /\.component\.less$/,
+        use: ['html-loader']
+      },
+      /*
+       * to string and css loader support for *.css files
+       * Returns file content as string
+       *
+       */
+      // {
+      //   test: /\.css$/,
+      //   use: [
+      //     MiniCssExtractPlugin.loader, {
+      //       loader: "css-loader",
+      //       options: {
+      //         minimize: true,
+      //         sourceMap: true
+      //       }
+      //     }]
+      // },
+      {
+        test: /\.less$/,
         use: [
+          // {
+          //   loader: MiniCssExtractPlugin.loader,
+          //   options: {
+          //     minimize: true,
+          //     sourceMap: true
+          //   }
+          // },
+          'css-to-string-loader',
           {
-            loader: 'to-string-loader'
-          }, {
             loader: 'css-loader',
             options: {
               minimize: true,
               sourceMap: true,
               context: '/'
             }
-          }, {
+          },
+          {
             loader: 'less-loader',
             options: {
               paths: [
-                path.resolve(__dirname, "../node_modules/patternfly/src/less"),
-                path.resolve(__dirname, "../node_modules/patternfly/node_modules")
+                path.resolve(__dirname, "../node_modules/patternfly/dist/less"),
+                path.resolve(__dirname, "../node_modules/patternfly/dist/less/dependencies"),
+                path.resolve(__dirname, "../node_modules/patternfly/dist/less/dependencies/bootstrap"),
+                path.resolve(__dirname, "../node_modules/patternfly/dist/less/dependencies/font-awesome"),
               ],
               sourceMap: true
             }
           }
-        ],
+        ]
       },
 
-      /* File loader for supporting fonts, for example, in CSS files.
-       */
-      {
-        test: /\.woff2?$|\.ttf$|\.eot$|\.svg$/,
-        loaders: [
-          {
-            loader: "url-loader",
-            query: {
-              limit: 3000,
-              name: 'assets/fonts/[name].[ext]'
-            }
-          }
-        ]
-      }, {
-        test: /\.jpg$|\.png$|\.gif$|\.jpeg$/,
-        loaders: [
-          {
-            loader: "url-loader",
-            query: {
-              limit: 3000,
-              name: 'assets/fonts/[name].[ext]'
-            }
-          }
-        ]
-      },
     ]
   },
 
@@ -128,7 +148,7 @@ module.exports = {
   },
 
   plugins: [
-    extractCSS,
+
     /*
      * StyleLintPlugin
      */
@@ -140,17 +160,25 @@ module.exports = {
       failOnError: true,
       quiet: false,
     }),
-    /*
-     * Plugin: CommonsChunkPlugin
-     * Description: Shares common code between the pages.
-     * It identifies common modules and put them into a commons chunk.
+
+    /**
+     * Plugin: ContextReplacementPlugin
+     * Description: Provides context to Angular's use of System.import
      *
-     * See: https://webpack.github.io/docs/list-of-plugins.html#commonschunkplugin
-     * See: https://github.com/webpack/docs/wiki/optimization#multi-page-app
+     * See: https://webpack.github.io/docs/list-of-plugins.html#contextreplacementplugin
+     * See: https://github.com/angular/angular/issues/11580
      */
-    new CommonsChunkPlugin({
-      name: ['app', 'vendor', 'polyfills']
-    }),
+    new ContextReplacementPlugin(
+      // The (\\|\/) piece accounts for path separators in *nix and Windows
+      // /angular(\\|\/)core(\\|\/)@angular/,
+      /\@angular(\\|\/)core(\\|\/)fesm5/,
+      helpers.root('./src')
+    ),
+    new ContextReplacementPlugin(
+      // The (\\|\/) piece accounts for path separators in *nix and Windows
+      /angular(\\|\/)core(\\|\/)@angular/,
+      helpers.root('./src')
+    ),
 
     /*
      * Plugin: HtmlWebpackPlugin
@@ -165,30 +193,23 @@ module.exports = {
       template: 'src/index.html'
     }),
 
-    /**
-     * Plugin: NamedModulesPlugin (experimental)
-     * Description: Uses file names as module name.
-     *
-     * See: https://github.com/webpack/webpack/commit/a04ffb928365b19feb75087c63f13cadfc08e1eb
-     */
-    new NamedModulesPlugin(),
+    // // Todo: config is not loading.
+    // new TsConfigPathsPlugin({
+    //   configFileName: helpers.root("tsconfig-demo.json")
+    // }),
 
-    // Todo: config is not loading.
-    new TsConfigPathsPlugin({
-      configFileName: helpers.root("tsconfig-demo.json")
-    }),
+  ],
 
-    /**
-     * Plugin: ContextReplacementPlugin
-     * Description: Provides context to Angular's use of System.import
-     *
-     * See: https://webpack.github.io/docs/list-of-plugins.html#contextreplacementplugin
-     * See: https://github.com/angular/angular/issues/11580
-     */
-    new webpack.ContextReplacementPlugin(
-      // The (\\|\/) piece accounts for path separators in *nix and Windows
-      /angular(\\|\/)core(\\|\/)@angular/,
-      helpers.root('src') // location of your src
-    )
-  ]
+  /**
+   * These common plugins were removed from Webpack 3 and are now set in this object.
+   */
+  optimization: {
+    namedModules: true, // NamedModulesPlugin()
+    splitChunks: { // CommonsChunkPlugin()
+      name: 'all'
+    },
+    noEmitOnErrors: true, // NoEmitOnErrorsPlugin
+    concatenateModules: true //ModuleConcatenationPlugin
+  },
+
 };
