@@ -28,20 +28,20 @@ describe('Markdown component - ', () => {
       });
   }));
 
-  it('Should handle Markdown checkboxes correctly.', async(() => {
-    inject([DomSanitizer], (domSanitizer: DomSanitizer) => {
+  it('Should handle Markdown checkboxes correctly.',
+    async(() => {
       let markdownCheckboxElementList: NodeListOf<HTMLElement>;
       // tslint:disable-next-line:max-line-length
       comp.inpRawText = '# hello, markdown!\n* [ ] Item 1\n* [x] Item 2\n* [ ] Item 3';
       let originalHTML = '<h1>hello, markdown!\</h1><ul>' +
       // tslint:disable-next-line:max-line-length
-      '<li><input class="markdown-checkbox" type="checkbox" data-checkbox-index="0"></input> Item 0</li>' +
+      '<li><input class="markdown-checkbox" type="checkbox" data-checkbox-index="0"></input> Item 1</li>' +
       // tslint:disable-next-line:max-line-length
-      '<li><input class="markdown-checkbox" type="checkbox" checked="" data-checkbox-index="1"></input> Item 1</li>' +
+      '<li><input class="markdown-checkbox" type="checkbox" checked="" data-checkbox-index="1"></input> Item 2</li>' +
       // tslint:disable-next-line:max-line-length
-      '<li><input class="markdown-checkbox" type="checkbox" data-checkbox-index="2"></input> Item 2</li></ul>';
+      '<li><input class="markdown-checkbox" type="checkbox" data-checkbox-index="2"></input> Item 3</li></ul>';
       // in this test, we provide a SaveValue to the component.
-      comp.inpRenderedText = domSanitizer.bypassSecurityTrustHtml(originalHTML);
+      comp.inpRenderedText = originalHTML;
       // this first detectChanges() updates the component that one of the @Inputs has changed.
       fixture.detectChanges();
       fixture.whenStable().then(() => {
@@ -75,20 +75,8 @@ describe('Markdown component - ', () => {
       }).then(() => {
         // see if it ends up in the Markdown
         expect(comp.rawText.indexOf('[x] Item 1')).toBeGreaterThan(-1);
-        // tick another checkbox
-        let checkboxElem = markdownCheckboxElementList[2];
-        checkboxElem.click();
-        fixture.detectChanges();
-      }).then(() => {        // see if it ends up in the Markdown
-        expect(comp.rawText.indexOf('[x] Item 3')).toBeGreaterThan(-1);
-        // untick a checkbox
-        let checkboxElem = markdownCheckboxElementList[1];
-        checkboxElem.click();
-        // see if it ends up in the Markdown
-        expect(comp.rawText.indexOf('[ ] Item 2')).toBeGreaterThan(-1);
       });
-    });
-  }));
+    }));
 
   it('should emit output onsave empty field when ' +
   '`allowEmptySave` is false and the field is empty', async(() => {

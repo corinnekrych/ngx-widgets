@@ -113,7 +113,7 @@ describe('Dialog component - ', () => {
     });
   }));
 
-  xit('Clicking a button will close the dialog.', async(() => {
+  it('Clicking a button will close the dialog.', async(() => {
     comp.dialog = dialog;
     fixture.detectChanges();
     comp.btnClick(0);
